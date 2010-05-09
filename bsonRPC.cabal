@@ -1,0 +1,32 @@
+Name:                bsonRPC
+Version:             0.0.1
+License:             MIT
+License-file:        LICENSE
+Maintainer:          Rick Richardson <rick.richardson@gmail.com> 
+Author:              Rick Richardson <rick.richardson@gmail.com> 
+Copyright:           Copyright (c) 2010-2010 Rick Richardson
+homepage:            http://github.com/rrichardson/bsonRPC
+Category:            Network
+Synopsis:            A simple network communication library using the BSON protocol
+Description:         This module will allow remote peers to communicate in a client/server
+                     or peer2peer arrangement using the flexible and extensible BSON protocol.
+                     This relies on the mongoDB driver for Haskell by Scott Parish. 
+Stability:           alpha
+Build-Depends:       base < 5,
+	       binary,
+		     bytestring,
+		     containers,
+		     data-binary-ieee754,
+		     network,
+		     random,
+		     time,
+		     unix,
+		     utf8-string,
+         nano-md5,
+         mongoDB
+Build-Type:          Simple
+Exposed-modules:     Network.BsonRPC
+Other-modules:       Network.BsonRPC.Util
+ghc-options:         -Wall -O2
+extensions:          FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances
+cabal-version:       >= 1.4
