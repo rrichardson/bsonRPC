@@ -23,10 +23,11 @@ Build-Depends:       base < 5,
 		     unix,
 		     utf8-string,
          nano-md5,
-         mongoDB
+         mongoDB,
+         mtl
 Build-Type:          Simple
 Exposed-modules:     Network.BsonRPC
-Other-modules:       Network.BsonRPC.Util
+Other-modules:       Network.BsonRPC.Util, Network.BsonRPC.BinUtil
 ghc-options:         -Wall -O2
-extensions:          FlexibleContexts, FlexibleInstances, MultiParamTypeClasses, TypeSynonymInstances
+extensions:          FlexibleInstances
 cabal-version:       >= 1.4

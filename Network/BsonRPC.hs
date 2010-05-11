@@ -41,34 +41,37 @@ module Network.BsonRPC
 ) where
 
 import Network.BsonRPC.Util
-import Data.ByteString
 import Database.MongoDB.BSON 
 import Control.Concurrent.MVar
+import Control.Monad
 import Data.Int
 import qualified Data.ByteString as B
 import System.IO
-import System.IO.Unsafe -- for debugging purposes 
+import System.IO.Unsafe -- for read-only debugging purposes 
 import qualified Network.Socket as Sock
+import qualified Data.Map as M
 
-type ServiceCallback = BsonMessage -> IO BsonMessage
+type ServiceCallback = BsonDoc -> IO (Maybe BsonDoc)
 
 class Connection a where 
   -- | Synchronous call to a remote peer (or peers) which returns the reply
-  call :: a -> BsonMessage -> IO [BsonMessage]
+  call :: a -> BsonDoc -> IO [BsonDoc]
 
   -- | Asynchronous call to a remote peer (or peers) which does not wait 
   --   nor does it expect a reply
-  cast :: a -> BsonMessage -> IO ()
+  cast :: a -> BsonDoc -> IO ()
 
   -- | Asynchronous call to a remote peer (or peers) which returns immediately
   --   but takes a callback for responses as they arrive
-  asyncCall :: a -> BsonMessage -> (BsonMessage -> IO ()) -> IO ()
+  asyncCall :: a -> BsonDoc -> ServiceCallback -> IO ()
 
-data Peer = Peer { pId :: ByteString,
-                   pSvcId :: ByteString, 
+data Peer = Peer { pId :: B.ByteString,
+                   pSvcId :: B.ByteString, 
                    pPort :: Int, 
                    pCurrent :: MVar Int64, 
-                   pConn :: Handle 
+                   pConn :: Handle,
+                   pPending :: MVar (M.Map Int64 ServiceCallback)
+                   pListener :: ThreadId
                  } deriving (Show)
 
 data Faction = Faction [Peer] deriving (Show)
@@ -76,17 +79,36 @@ data Faction = Faction [Peer] deriving (Show)
 instance Show (MVar Int64) where
   show a = Prelude.show $ unsafePerformIO $ readMVar a
 
-{-
+instance Show (MVar (M.Map Int64 ServiceCallback)) where
+  show a = unsafePerformIO $ isEmptyMVar a >>= \b -> return $ if b then "<empty>" else "<Map of functions>"
+
 instance Connection Peer where
-  call p msg = 
-  cast p msg = 
-  asyncCall p msg cb = 
+  call p msg = getNextMsgId p >>= putMessage (pConn p) msg >> forM [(pConn p)] getMessage
+  cast p msg = getNextMsgId p >>= putMessage (pConn p) msg
+  asyncCall p msg cb = do 
+    mid <- getNextMsgId p
+    addCallback p mid cb
+    putMessage (pConn p) msg mid 
 
 instance Connection Faction where
-  call p msg = 
-  cast p msg = 
-  asyncCall p msg cb = 
--}
+  call (Faction prs) msg = forM prs (\p -> do
+    mid <- getNextMsgId p
+    putMessage (pConn p) msg mid
+    getMessage (pConn p))
+
+  cast (Faction prs) msg = forM_ prs (\p -> do
+    mid <- getNextMsgId p
+    putMessage (pConn p) msg mid)
+
+  asyncCall (Faction prs) msg cb = forM_ prs (\p -> do
+    mid <- getNextMsgId p
+    addCallback p mid cb
+    putMessage (pConn p) msg mid)
+
+
+addCallback :: Peer -> Int64 -> ServiceCallback -> IO ()
+addCallback p mid cb = modifyMVar (pPending p) (\x -> let y = M.insert mid cb x in return (y, ()))
+
 {- 
  - Server Functions
  -}
@@ -103,7 +125,7 @@ serveEx fam addr cb = do
  - Client Functions
  -}
 
-connectPeer :: String -> Int -> IO (Peer)
+connectPeer :: String -> Int -> IO Peer
 connectPeer host port = do 
   addr <- Sock.inet_addr host
   connectPeerEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) addr)
@@ -116,7 +138,14 @@ connectPeerEx fam addr = do
             _ -> 0 
   h <- doWithNet fam addr (\s a -> Sock.connect s addr )
   createPeer h p 
-    
+ 
+connectFaction :: [(String, Int)] -> IO Faction
+connectFaction xs = Faction `liftM` (forM xs con) 
+  where con (h, p) = connectPeer h p
+
+connectFactionEx :: Sock.Family -> [Sock.SockAddr] -> IO Faction
+connectFactionEx fam addrs = Faction `liftM` (forM addrs con) 
+  where con a = connectPeerEx fam a
 
 initMessage :: Peer -> Int64 -> BsonDoc -> IO BsonMessage
 initMessage peer respto doc = do
@@ -130,4 +159,26 @@ getNextMsgId peer = modifyMVar (pCurrent peer) (\x -> let y = x + 1 in return (y
 createPeer :: Handle -> Sock.PortNumber -> IO Peer
 createPeer h p = do
   c <- newMVar (0 :: Int64)
-  return $ Peer B.empty B.empty (fromIntegral p) c h 
+  cbm <- newMVar M.empty
+  t <- forkIO $ forever $ listen h cbm
+  return $ Peer B.empty B.empty (fromIntegral p) c h cbm t
+
+-- TODO fix with Maybe monad -- use MVar lookup
+listen :: Handle -> M.Map Int64 ServiceCallback -> IO ()
+listen h m = do 
+  msg@(BsonMessage hdr doc) <- getMessage h
+  let mid = bhMessageId hdr
+  case M.lookup mid of 
+    None -> return ()
+    Some cb -> forkIO $ do 
+      res <- cb msg
+      case res of
+        None -> return ()
+        Some newmsg -> do 
+          mid <- getNextMsgId 
+          modifyMVar m (\x -> let y = M.insert mid cb x in return (y, ()))
+          addCallback p mid cb
+          putMessage (pConn p) msg mid 
+          
+    
+   
