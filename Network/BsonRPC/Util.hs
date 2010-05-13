@@ -51,10 +51,12 @@ import Control.Concurrent
 import Control.Concurrent.QSem
 import Control.Concurrent.Chan
 import Control.Monad
+import Control.Applicative
 
-data BsonHeader = BsonHeader { bhSize        :: Int32,
+data BsonHeader = BsonHeader { bhSize        :: Int16,
+                               bhType        :: Int16,
                                bhVersion     :: Int16,
-                               bhDest        :: Int16, 
+                               bhDest        :: Int16,
                                bhMessageId   :: Int64,
                                bhResponseTo  :: Int64,
                                bhOriginator1 :: Word32,
@@ -64,6 +66,7 @@ data BsonHeader = BsonHeader { bhSize        :: Int32,
                               } -- 40 bytes total
                              
 data BsonMessage = BsonMessage BsonHeader BsonDoc 
+
 
 
 protoTCP   = (6 :: CInt)
@@ -80,7 +83,7 @@ listenOnEx fam addr = do
             (Sock.SockAddrInet6 port _ _ _) -> port
             _ -> 0 
   doWithSocket fam addr (\s a -> do 
-                            Sock.bindSocket s addr
+                            Sock.bindSocket s a
                             Sock.listen s (fromIntegral p))
 
 doWithSocket :: Sock.Family -> Sock.SockAddr -> (Sock.Socket -> Sock.SockAddr -> IO ()) -> IO Sock.Socket
@@ -91,31 +94,29 @@ doWithSocket fam addr fun = do
 
 getMessage :: Handle -> IO (BsonMessage)
 getMessage h = do
-  hdrBytes <- L.hGet h 44 
-  return $ flip runGet hdrBytes $ do
-                msgLen <- getI32
-                ver    <- getI16
-                dest   <- getI16
-                mid    <- getI64
-                respTo <- getI64
-                origin1 <- getW32
-                origin2 <- getW32
-                origin3 <- getW32
-                origin4 <- getW32
-                doc    <- getBsonDoc
-                return $ BsonMessage (BsonHeader msgLen ver dest mid respTo origin1 origin2 origin3 origin4) doc 
+  hdrBytes <- L.hGet h 40
+  let hdr = flip runGet hdrBytes $ 
+              BsonHeader <$> getI16 <*> getI16 <*>
+                getI16 <*> getI16 <*> getI64 <*> getI64 <*>
+                getW32 <*> getW32 <*> getW32 <*> getW32
+  docBytes <- L.hGet h ((fromIntegral (bhSize hdr))- 40)
+  let doc = runGet getBsonDoc docBytes
+  return $ BsonMessage hdr doc 
 
-putMessage :: Handle -> BsonMessage -> Int64 -> IO ()
-putMessage h (BsonMessage hdr doc) respto = do
+putMessage :: Handle -> BsonMessage -> IO ()
+putMessage h (BsonMessage hdr doc) = do
   let msg = runPut $ putBsonDoc doc
-  let hdstr = runPut $ do
-                putI32 $ fromIntegral (44 + L.length msg)
+  let str = runPut $ do
+                putI16 $ fromIntegral (40 + L.length msg)
+                putI16 $ bhType hdr 
                 putI16 $ bhVersion hdr
                 putI16 $ bhDest hdr
                 putI64 $ bhMessageId hdr
-                putI64 $ respto 
+                putI64 $ bhResponseTo  hdr
                 putW32 $ bhOriginator1 hdr
                 putW32 $ bhOriginator2 hdr
                 putW32 $ bhOriginator3 hdr
                 putW32 $ bhOriginator4 hdr
-  L.hPut h $ hdstr `L.append` msg
+                putLazyByteString msg
+  L.hPut h $ str
+  hFlush h

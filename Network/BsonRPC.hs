@@ -29,6 +29,7 @@ module Network.BsonRPC
   Connection, -- Generic Connection Interface
   Faction,    -- Group of Connections to peers, treated as a single, broadcasting connection
   Peer,       -- Single Connection
+  ServiceCallback(..),
   connectPeer, -- Connect to a remote host
   connectPeerEx,  -- Connect to a remote host in ipv6 or ipv4
   connectFaction, -- Connect to a list of remote hosts and group them
@@ -76,21 +77,20 @@ data Peer = Peer { pId :: B.ByteString,
 
 data Faction = Faction [Peer] deriving (Show)
 
-type ServiceCallback = BsonDoc -> IO (Maybe BsonDoc)
+data ServiceCallback = ServiceCallback (BsonDoc -> IO (Maybe (BsonDoc, ServiceCallback)))
 
 instance Connection Peer where
   call doc p = syncRequests doc [p]
 
   cast doc p = do
-    mid <- getNextMsgId (pCurrent p)
-    msg <- initMessage p mid doc
-    putMessage (pConn p) msg mid
+    msg <- initMessage p MsgTypeCast 0 doc
+    putMessage (pConn p) msg
 
   asyncCall doc cb p = do 
     mid <- getNextMsgId (pCurrent p)
     addCallback (pPending p) mid cb
-    msg <- initMessage p mid doc
-    putMessage (pConn p) msg mid 
+    msg <- initMessage p MsgTypeCall 0 doc
+    putMessage (pConn p) msg 
 
 instance Connection Faction where
   call doc (Faction prs) = syncRequests doc prs
@@ -105,30 +105,43 @@ instance Connection Faction where
  - Server Functions
  -}
 
-serve :: Int -> ServiceCallback -> IO ()
-serve port cb = serveEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY) cb
+serve :: Int -> (Maybe ServiceCallback, Maybe ServiceCallback) -> IO ()
+serve port cbs = serveEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY) cbs
 
-serveEx :: Sock.Family -> Sock.SockAddr -> ServiceCallback -> IO () 
-serveEx fam addr cb = do
+serveEx :: Sock.Family -> Sock.SockAddr -> (Maybe ServiceCallback, Maybe ServiceCallback) -> IO () 
+serveEx fam addr (callcb, castcb) = do
   s <- listenOnEx fam addr
   forever $ do 
-    (rs, raddr) <- Sock.accept s
+    (rs, _) <- Sock.accept s
     rh <- Sock.socketToHandle rs ReadWriteMode
-    hSetBuffering rh NoBuffering
-    forkIO $ handlePeer rh cb
+    --hSetBuffering rh NoBuffering
+    forkIO $ handlePeer rh callcb castcb
 
-handlePeer :: Handle -> ServiceCallback -> IO ()
-handlePeer h cb = do
-  self <- createPeer h 0 
+handlePeer :: Handle -> Maybe ServiceCallback -> Maybe ServiceCallback -> IO ()
+handlePeer h callcb castcb = do
+  putStrLn "Client Connected"
+  !self <- myThreadId >>= createPeer h 0
   forever $ do
+    putStrLn "Before receiving message"
     (BsonMessage hdr doc) <- getMessage h
-    mrep <- cb doc
-    case mrep of
-      Nothing -> return ()
-      Just reply -> do
-        mid <- getNextMsgId (pCurrent self)
-        msg <- initMessage self mid reply
-        putMessage h msg (bhMessageId hdr)
+    putStrLn "Received Message"
+    case (getMsgType hdr) of
+      MsgTypeCall -> case callcb of 
+        Nothing -> putStrLn "Received a call msg for which I don't have a handler"
+        Just (ServiceCallback cb) -> do
+          mrep <- cb doc
+          case mrep of
+            Nothing -> return ()
+            Just (reply, newcb) -> do
+              mid <- getNextMsgId (pCurrent self)
+              msg <- initMessage self MsgTypeCall (bhMessageId hdr) reply
+              addCallback  (pPending self) mid newcb
+              putMessage h msg 
+      MsgTypeCast -> case castcb of
+        Nothing -> putStrLn "Received msg for which I don't have a handler"
+        Just (ServiceCallback cb) -> do 
+        cb doc
+        return ()
 
 {- 
  - Client Functions
@@ -144,8 +157,8 @@ connectPeerEx fam addr = do
   let p = addrToIntPort addr
   sock <- doWithSocket fam addr (\s a -> Sock.connect s a )
   h <- Sock.socketToHandle sock ReadWriteMode
-  hSetBuffering h NoBuffering
-  createPeer h $ fromIntegral p 
+  --hSetBuffering h NoBuffering
+  createListeningPeer h $ fromIntegral p 
  
 connectFaction :: [(String, Int)] -> IO Faction
 connectFaction xs = Faction `liftM` (forM xs con) 
@@ -162,32 +175,34 @@ connectFactionEx fam addrs = Faction `liftM` (forM addrs con)
 
 
 listen :: Handle -> MVar (M.Map Int64 ServiceCallback) -> MVar Int64 -> IO ()
-listen h m cur= do 
+listen h m cur= do
+  putStrLn "Listening for message"
   (BsonMessage hdr doc) <- getMessage h
   let mid = bhMessageId hdr
   cbmap <- readMVar m 
   case M.lookup mid cbmap of 
     Nothing -> return ()
-    Just cb -> forkIO (do 
+    Just (ServiceCallback cb) -> do 
       modifyMVar m (\x -> let y = M.delete mid x in return (y, ())) -- get rid of the existing cb
       mres <- cb doc
       case mres of
         Nothing -> return ()
-        Just reply -> do 
+        Just (reply, newcb) -> do 
           newid <- getNextMsgId cur
-          let newhdr = BsonHeader 0 0 0 newid mid 0 0 0 0
-          addCallback m newid cb
-          putMessage h (BsonMessage newhdr reply) newid) >> return ()
-  
+          let newhdr = BsonHeader 0 (msgTypeToInt MsgTypeCall) 0 0 newid mid 0 0 0 0
+          addCallback m newid newcb 
+          putMessage h (BsonMessage newhdr reply)
+    
+ 
 syncRequests :: BsonDoc -> [Peer] -> IO [BsonDoc]
 syncRequests doc prs = do  
     sem <- newQSem (length prs)
     c <- newChan
     forM_ prs $ \p -> do
       mid <- getNextMsgId (pCurrent p)
-      msg <- initMessage p mid doc
+      msg <- initMessage p MsgTypeCall 0 doc
       registerSync p c sem mid
-      putMessage (pConn p) msg mid 
+      putMessage (pConn p) msg
     waitQSem sem
     collect (length prs) c []
     where collect 0      _   acc = return acc
@@ -195,23 +210,29 @@ syncRequests doc prs = do
 
 registerSync :: Peer -> Chan BsonDoc -> QSem -> Int64 -> IO ()
 registerSync p chan sem mid = do
-  let cb = (\doc -> writeChan chan doc >> signalQSem sem >> return Nothing)
+  let cb = ServiceCallback (\doc -> writeChan chan doc >> signalQSem sem >> return Nothing)
   addCallback (pPending p) mid cb
 
-initMessage :: Peer -> Int64 -> BsonDoc -> IO BsonMessage
-initMessage peer respto doc = do
+initMessage :: Peer -> MessageType -> Int64 -> BsonDoc -> IO BsonMessage
+initMessage peer mtype respto doc = do
   mid <- getNextMsgId (pCurrent peer)
-  let hdr = BsonHeader 0 0 0 mid respto 0 0 0 0
+  let hdr = BsonHeader 0 (msgTypeToInt mtype) 0 0 mid respto 0 0 0 0
   return $ BsonMessage hdr doc 
 
 getNextMsgId :: MVar Int64 -> IO Int64
 getNextMsgId current = modifyMVar current (\x -> let y = x + 1 in return (y, y) ) 
  
-createPeer :: Handle -> Sock.PortNumber -> IO Peer
-createPeer h p = do
+createListeningPeer :: Handle -> Sock.PortNumber -> IO Peer
+createListeningPeer h p = do
   c <- newMVar (0 :: Int64)
   cbm <- newMVar M.empty
   t <- forkIO $ forever $ listen h cbm c
+  return $ Peer B.empty B.empty (fromIntegral p) c h cbm t
+
+createPeer :: Handle -> Sock.PortNumber -> ThreadId -> IO Peer
+createPeer h p t = do
+  c <- newMVar (0 :: Int64)
+  cbm <- newMVar M.empty
   return $ Peer B.empty B.empty (fromIntegral p) c h cbm t
  
 addCallback :: MVar (M.Map Int64 ServiceCallback) -> Int64 -> ServiceCallback -> IO ()
@@ -221,9 +242,24 @@ instance Show (MVar Int64) where
   show a = Prelude.show $ unsafePerformIO $ readMVar a
 
 instance Show (MVar (M.Map Int64 ServiceCallback)) where
-  show a = unsafePerformIO $ isEmptyMVar a >>= \b -> return $ if b then "<empty>" else "<Map of functions>"
+  show a = unsafePerformIO $ isEmptyMVar a >>= \b -> 
+    return $ if b then "<empty>" else "<map full of functions>" 
 
 addrToIntPort :: Sock.SockAddr -> Int
 addrToIntPort (Sock.SockAddrInet port _)      = fromIntegral port
 addrToIntPort (Sock.SockAddrInet6 port _ _ _) = fromIntegral port
-addrToIntPort  _                              = 0 
+addrToIntPort  _                              = 0
+
+data MessageType = MsgTypeCall | MsgTypeCast
+
+msgTypeToInt :: MessageType -> Int16
+msgTypeToInt MsgTypeCall = 0
+msgTypeToInt MsgTypeCast = 1
+
+intToMsgType :: Int16 -> MessageType
+intToMsgType 0 = MsgTypeCall
+intToMsgType 1 = MsgTypeCast
+intToMsgType _ = error "wtf?"
+
+getMsgType :: BsonHeader -> MessageType
+getMsgType = intToMsgType . bhType 
