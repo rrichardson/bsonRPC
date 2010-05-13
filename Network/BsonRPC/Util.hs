@@ -28,7 +28,7 @@ module Network.BsonRPC.Util
 (
   listenOn,
   listenOnEx,
-  doWithNet,
+  doWithSocket,
   getMessage,
   putMessage,
   BsonMessage(..),
@@ -36,16 +36,21 @@ module Network.BsonRPC.Util
   protoTCP
 )
 where
-import qualified Network.Socket as Sock
-import qualified Data.ByteString.Lazy as L
-import System.IO
-import Foreign.C.Types (CInt)
-import Database.MongoDB.BSON
+
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
 import Data.Word
+import System.IO
+import Foreign.C.Types (CInt)
+import Database.MongoDB.BSON
 import Network.BsonRPC.BinUtil
+import qualified Network.Socket as Sock
+import qualified Data.ByteString.Lazy as L
+import Control.Concurrent
+import Control.Concurrent.QSem
+import Control.Concurrent.Chan
+import Control.Monad
 
 data BsonHeader = BsonHeader { bhSize        :: Int32,
                                bhVersion     :: Int16,
@@ -65,26 +70,24 @@ protoTCP   = (6 :: CInt)
 protoUDP   = (17 :: CInt)
 protoSCTP  = (132 :: CInt)
 
-listenOn :: Int -> IO Handle
+listenOn :: Int -> IO Sock.Socket
 listenOn port = listenOnEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY)
 
-listenOnEx :: Sock.Family -> Sock.SockAddr -> IO Handle
+listenOnEx :: Sock.Family -> Sock.SockAddr -> IO Sock.Socket
 listenOnEx fam addr = do
   let p = case addr of 
             (Sock.SockAddrInet port _) -> port
             (Sock.SockAddrInet6 port _ _ _) -> port
             _ -> 0 
-  doWithNet fam addr (\s a -> do 
+  doWithSocket fam addr (\s a -> do 
                             Sock.bindSocket s addr
                             Sock.listen s (fromIntegral p))
 
-doWithNet :: Sock.Family -> Sock.SockAddr -> (Sock.Socket -> Sock.SockAddr -> IO ()) -> IO Handle
-doWithNet fam addr fun = do
+doWithSocket :: Sock.Family -> Sock.SockAddr -> (Sock.Socket -> Sock.SockAddr -> IO ()) -> IO Sock.Socket
+doWithSocket fam addr fun = do
   s <- Sock.socket fam Sock.Stream protoTCP
   fun s addr
-  h <- Sock.socketToHandle s ReadWriteMode
-  hSetBuffering h NoBuffering
-  return h
+  return s
 
 getMessage :: Handle -> IO (BsonMessage)
 getMessage h = do
@@ -103,14 +106,14 @@ getMessage h = do
                 return $ BsonMessage (BsonHeader msgLen ver dest mid respTo origin1 origin2 origin3 origin4) doc 
 
 putMessage :: Handle -> BsonMessage -> Int64 -> IO ()
-putMessage h (BsonMessage hdr doc) mid = do
+putMessage h (BsonMessage hdr doc) respto = do
   let msg = runPut $ putBsonDoc doc
   let hdstr = runPut $ do
                 putI32 $ fromIntegral (44 + L.length msg)
                 putI16 $ bhVersion hdr
                 putI16 $ bhDest hdr
                 putI64 $ bhMessageId hdr
-                putI64 $ mid 
+                putI64 $ respto 
                 putW32 $ bhOriginator1 hdr
                 putW32 $ bhOriginator2 hdr
                 putW32 $ bhOriginator3 hdr
