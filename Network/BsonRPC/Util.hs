@@ -63,9 +63,9 @@ data BsonHeader = BsonHeader { bhSize        :: Int16,
                                bhOriginator2 :: Word32,
                                bhOriginator3 :: Word32, 
                                bhOriginator4 :: Word32
-                              } -- 40 bytes total
+                              } deriving (Show) -- 40 bytes total
                              
-data BsonMessage = BsonMessage BsonHeader BsonDoc 
+data BsonMessage = BsonMessage BsonHeader BsonDoc deriving (Show) 
 
 
 
@@ -118,5 +118,5 @@ putMessage h (BsonMessage hdr doc) = do
                 putW32 $ bhOriginator3 hdr
                 putW32 $ bhOriginator4 hdr
                 putLazyByteString msg
-  L.hPut h $ str
+  L.hPut h str
   hFlush h

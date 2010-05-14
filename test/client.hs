@@ -12,6 +12,7 @@ main = do
   !friend <- connectPeer "127.0.0.1" 12345
   cast (toBsonDoc msg) friend
   resp <- call (toBsonDoc msg) friend
+  putStrLn $ "got response: " ++ (show resp)
   forM_ resp (putStrLn . show)
   return ()
 

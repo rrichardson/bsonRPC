@@ -133,9 +133,11 @@ handlePeer h callcb castcb = do
           case mrep of
             Nothing -> return ()
             Just (reply, newcb) -> do
+              putStrLn "preparing to send reply"
               mid <- getNextMsgId (pCurrent self)
               msg <- initMessage self MsgTypeCall (bhMessageId hdr) reply
               addCallback  (pPending self) mid newcb
+              putStrLn $ "sending reply: " ++ (show msg)
               putMessage h msg 
       MsgTypeCast -> case castcb of
         Nothing -> putStrLn "Received msg for which I don't have a handler"
@@ -204,9 +206,10 @@ syncRequests doc prs = do
       registerSync p c sem mid
       putMessage (pConn p) msg
     waitQSem sem
+    putStrLn $ "collecting " ++ (show (length prs))
     collect (length prs) c []
     where collect 0      _   acc = return acc
-          collect count chan acc = do !i <- readChan chan; collect (count - 1) chan (i:acc)
+          collect count chan acc = do !i <- readChan chan; putStrLn (show i); collect (count - 1) chan (i:acc)
 
 registerSync :: Peer -> Chan BsonDoc -> QSem -> Int64 -> IO ()
 registerSync p chan sem mid = do
