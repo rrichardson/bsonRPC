@@ -37,8 +37,9 @@ module Network.BsonRPC
   call,        -- Synchronous Call with response
   cast,        -- Asynchronous call with no response
   asyncCall,   -- Asynchronous call with callbacks for responses
+  shutdown,    -- Close a connection as a peer 
   serve,       -- Listen on a port and respond to requests with a callback
-  serveEx      -- Listen on a port and ipv6 or ipv4 interface ... callback
+  serveEx,     -- Listen on a port and ipv6 or ipv4 interface ... callback
 ) where
 
 import Data.Int
@@ -46,6 +47,7 @@ import qualified Data.Map as M
 import Control.Monad
 import Control.Concurrent
 import Control.Concurrent.MVar
+import Control.Exception (throwIO)
 import System.IO
 import System.IO.Unsafe -- for read-only debugging purposes 
 import qualified Network.Socket as Sock
@@ -82,9 +84,8 @@ data ServiceCallback = ServiceCallback (BsonDoc -> IO (Maybe (BsonDoc, ServiceCa
 instance Connection Peer where
   call doc p = syncRequests doc [p]
 
-  cast doc p = do
-    msg <- initMessage p MsgTypeCast 0 doc
-    putMessage (pConn p) msg
+  cast doc p = initMessage p MsgTypeCast 0 doc >>= 
+    putMessage (pConn p) 
 
   asyncCall doc cb p = do 
     mid <- getNextMsgId (pCurrent p)
@@ -96,17 +97,17 @@ instance Connection Faction where
   call doc (Faction prs) = syncRequests doc prs
      
   cast doc (Faction prs) = 
-    forM_ prs $ \p -> cast doc p
+    forM_ prs $ cast doc
     
   asyncCall doc cb (Faction prs) = 
-    forM_ prs $ \p -> asyncCall doc cb p
+    forM_ prs $ asyncCall doc cb
 
 {- 
  - Server Functions
  -}
 
 serve :: Int -> (Maybe ServiceCallback, Maybe ServiceCallback) -> IO ()
-serve port cbs = serveEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY) cbs
+serve port = serveEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY) 
 
 serveEx :: Sock.Family -> Sock.SockAddr -> (Maybe ServiceCallback, Maybe ServiceCallback) -> IO () 
 serveEx fam addr (callcb, castcb) = do
@@ -115,13 +116,13 @@ serveEx fam addr (callcb, castcb) = do
     (rs, _) <- Sock.accept s
     rh <- Sock.socketToHandle rs ReadWriteMode
     --hSetBuffering rh NoBuffering
-    forkIO $ handlePeer rh callcb castcb
+    forkIO (handlePeer rh callcb castcb)
 
 handlePeer :: Handle -> Maybe ServiceCallback -> Maybe ServiceCallback -> IO ()
 handlePeer h callcb castcb = do
   putStrLn "Client Connected"
   !self <- myThreadId >>= createPeer h 0
-  forever $ do
+  flip catch (closePeer h) $ forever $ do
     putStrLn "Before receiving message"
     (BsonMessage hdr doc) <- getMessage h
     putStrLn "Received Message"
@@ -137,14 +138,21 @@ handlePeer h callcb castcb = do
               mid <- getNextMsgId (pCurrent self)
               msg <- initMessage self MsgTypeCall (bhMessageId hdr) reply
               addCallback  (pPending self) mid newcb
-              putStrLn $ "sending reply: " ++ (show msg)
+              putStrLn $ "sending reply: " ++ show msg
               putMessage h msg 
       MsgTypeCast -> case castcb of
         Nothing -> putStrLn "Received msg for which I don't have a handler"
         Just (ServiceCallback cb) -> do 
         cb doc
         return ()
+      MsgTypeShutDown -> throwIO $ userError "end of session"
 
+closePeer :: Handle -> IOError -> IO ()
+closePeer h e = do
+  putStrLn "closing peer"
+  print e
+  hClose h 
+  
 {- 
  - Client Functions
  -}
@@ -157,19 +165,24 @@ connectPeer host port = do
 connectPeerEx :: Sock.Family -> Sock.SockAddr -> IO (Peer)
 connectPeerEx fam addr = do
   let p = addrToIntPort addr
-  sock <- doWithSocket fam addr (\s a -> Sock.connect s a )
+  sock <- doWithSocket fam addr Sock.connect 
   h <- Sock.socketToHandle sock ReadWriteMode
   --hSetBuffering h NoBuffering
   createListeningPeer h $ fromIntegral p 
  
 connectFaction :: [(String, Int)] -> IO Faction
-connectFaction xs = Faction `liftM` (forM xs con) 
+connectFaction xs = Faction `liftM` forM xs con 
   where con (h, p) = connectPeer h p
 
 connectFactionEx :: Sock.Family -> [Sock.SockAddr] -> IO Faction
-connectFactionEx fam addrs = Faction `liftM` (forM addrs con) 
-  where con a = connectPeerEx fam a
+connectFactionEx fam addrs = Faction `liftM` forM addrs con 
+  where con = connectPeerEx fam
 
+shutdown :: Peer -> IO ()
+shutdown p = do 
+  killThread (pListener p)
+  msg <- initMessage p MsgTypeShutDown 0 $ toBsonDoc [("", BsonNull)] 
+  putMessage (pConn p) msg
   
 {-
  - Private Functions
@@ -206,10 +219,10 @@ syncRequests doc prs = do
       registerSync p c sem mid
       putMessage (pConn p) msg
     waitQSem sem
-    putStrLn $ "collecting " ++ (show (length prs))
+    putStrLn $ "collecting " ++ show (length prs)
     collect (length prs) c []
     where collect 0      _   acc = return acc
-          collect count chan acc = do !i <- readChan chan; putStrLn (show i); collect (count - 1) chan (i:acc)
+          collect count chan acc = do !i <- readChan chan; print i; collect (count - 1) chan (i:acc)
 
 registerSync :: Peer -> Chan BsonDoc -> QSem -> Int64 -> IO ()
 registerSync p chan sem mid = do
@@ -242,7 +255,7 @@ addCallback :: MVar (M.Map Int64 ServiceCallback) -> Int64 -> ServiceCallback ->
 addCallback pending mid cb = modifyMVar pending (\x -> let y = M.insert mid cb x in return (y, ()))
 
 instance Show (MVar Int64) where
-  show a = Prelude.show $ unsafePerformIO $ readMVar a
+  show = Prelude.show . unsafePerformIO . readMVar
 
 instance Show (MVar (M.Map Int64 ServiceCallback)) where
   show a = unsafePerformIO $ isEmptyMVar a >>= \b -> 
@@ -253,15 +266,17 @@ addrToIntPort (Sock.SockAddrInet port _)      = fromIntegral port
 addrToIntPort (Sock.SockAddrInet6 port _ _ _) = fromIntegral port
 addrToIntPort  _                              = 0
 
-data MessageType = MsgTypeCall | MsgTypeCast
+data MessageType = MsgTypeCall | MsgTypeCast | MsgTypeShutDown
 
 msgTypeToInt :: MessageType -> Int16
 msgTypeToInt MsgTypeCall = 0
 msgTypeToInt MsgTypeCast = 1
+msgTypeToInt MsgTypeShutDown = 2
 
 intToMsgType :: Int16 -> MessageType
 intToMsgType 0 = MsgTypeCall
 intToMsgType 1 = MsgTypeCast
+intToMsgType 2 = MsgTypeShutDown
 intToMsgType _ = error "wtf?"
 
 getMsgType :: BsonHeader -> MessageType

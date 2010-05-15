@@ -47,9 +47,6 @@ import Database.MongoDB.BSON
 import Network.BsonRPC.BinUtil
 import qualified Network.Socket as Sock
 import qualified Data.ByteString.Lazy as L
-import Control.Concurrent
-import Control.Concurrent.QSem
-import Control.Concurrent.Chan
 import Control.Monad
 import Control.Applicative
 
@@ -69,9 +66,9 @@ data BsonMessage = BsonMessage BsonHeader BsonDoc deriving (Show)
 
 
 
-protoTCP   = (6 :: CInt)
-protoUDP   = (17 :: CInt)
-protoSCTP  = (132 :: CInt)
+protoTCP   = 6 :: CInt
+protoUDP   = 17 :: CInt
+protoSCTP  = 132 :: CInt
 
 listenOn :: Int -> IO Sock.Socket
 listenOn port = listenOnEx Sock.AF_INET (Sock.SockAddrInet (fromIntegral port) Sock.iNADDR_ANY)
@@ -94,12 +91,13 @@ doWithSocket fam addr fun = do
 
 getMessage :: Handle -> IO (BsonMessage)
 getMessage h = do
+  res <- hWaitForInput h (-1)
   hdrBytes <- L.hGet h 40
   let hdr = flip runGet hdrBytes $ 
               BsonHeader <$> getI16 <*> getI16 <*>
                 getI16 <*> getI16 <*> getI64 <*> getI64 <*>
                 getW32 <*> getW32 <*> getW32 <*> getW32
-  docBytes <- L.hGet h ((fromIntegral (bhSize hdr))- 40)
+  docBytes <- L.hGet h (fromIntegral (bhSize hdr)- 40)
   let doc = runGet getBsonDoc docBytes
   return $ BsonMessage hdr doc 
 
