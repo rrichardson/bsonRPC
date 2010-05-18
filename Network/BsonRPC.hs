@@ -40,6 +40,7 @@ module Network.BsonRPC
   shutdown,    -- Close a connection as a peer 
   serve,       -- Listen on a port and respond to requests with a callback
   serveEx,     -- Listen on a port and ipv6 or ipv4 interface ... callback
+  nullMessage  -- A response which indicates no response
 ) where
 
 import Data.Int
@@ -183,6 +184,9 @@ shutdown p = do
   killThread (pListener p)
   msg <- initMessage p MsgTypeShutDown 0 $ toBsonDoc [("", BsonNull)] 
   putMessage (pConn p) msg
+
+nullMessage ::ServiceCallback -> Maybe (BsonDoc, ServiceCallback)
+nullMessage fun = Just (toBsonDoc [("", BsonNull)], fun)
   
 {-
  - Private Functions
