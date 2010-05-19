@@ -124,7 +124,6 @@ handlePeer h callcb castcb = do
   where 
     loop self cl cst = do
     blah@(BsonMessage hdr doc) <- getMessage h
-    putStrLn $ "Received Message" ++ show blah
     case (getMsgType hdr) of
       MsgTypeCall -> case cl of 
         Nothing -> putStrLn "Received a call msg for which I don't have a handler"
@@ -134,7 +133,6 @@ handlePeer h callcb castcb = do
             Nothing -> loop self cl cst
             Just (reply, newcb) -> do
               (mid, msg) <- initMessage self MsgTypeCall (bhMessageId hdr) reply
-              putStrLn $ "sending reply: " ++ show msg
               putMessage h msg 
               loop self (Just newcb) cst 
       MsgTypeCast -> case cst of
@@ -146,7 +144,6 @@ handlePeer h callcb castcb = do
 
 closePeer :: Handle -> IOError -> IO ()
 closePeer h e = do
-  putStrLn "closing peer"
   print e
   hClose h 
   
@@ -189,11 +186,10 @@ shutdown p = do
 listen :: Handle -> MVar (M.Map Int64 ServiceCallback) -> MVar Int64 -> IO ()
 listen h m cur= do
   blah@(BsonMessage hdr doc) <- getMessage h
-  putStrLn $ "Got message: " ++ show blah
   let mid = bhMessageId hdr
   cbmap <- readMVar m 
   case M.lookup mid cbmap of 
-    Nothing -> (putStrLn $ "no cb for mid: " ++ show mid) >> return ()
+    Nothing -> return ()
     Just (ServiceCallback cb) -> do 
       modifyMVar m (\x -> let y = M.delete mid x in return (y, ())) -- get rid of the existing cb
       mres <- cb doc
@@ -217,7 +213,7 @@ syncRequests doc prs = do
     waitQSem sem
     collect (length prs) c []
     where collect 0      _   acc = return acc
-          collect count chan acc = do !i <- readChan chan; print i; collect (count - 1) chan (i:acc)
+          collect count chan acc = do !i <- readChan chan; collect (count - 1) chan (i:acc)
 
 registerSync :: Peer -> Chan BsonDoc -> QSem -> Int64 -> IO ()
 registerSync p chan sem mid = do
@@ -247,7 +243,7 @@ createPeer h p t = do
   return $ Peer B.empty B.empty (fromIntegral p) c h cbm t
  
 addCallback :: MVar (M.Map Int64 ServiceCallback) -> Int64 -> ServiceCallback -> IO ()
-addCallback pending mid cb = (putStrLn ("adding callback for " ++ show mid)) >> 
+addCallback pending mid cb = 
   modifyMVar pending (\x -> let y = M.insert mid cb x in return (y, ()))
 
 instance Show (MVar Int64) where
