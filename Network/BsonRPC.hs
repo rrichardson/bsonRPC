@@ -27,7 +27,7 @@ WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 module Network.BsonRPC
 (
   Connection, -- Generic Connection Interface
-  Faction,    -- Group of Connections to peers, treated as a single, broadcasting connection
+  Faction(..),    -- Group of Connections to peers, treated as a single, broadcasting connection
   Peer,       -- Single Connection
   ServiceCallback(..),
   connectPeer, -- Connect to a remote host
@@ -40,7 +40,6 @@ module Network.BsonRPC
   shutdown,    -- Close a connection as a peer 
   serve,       -- Listen on a port and respond to requests with a callback
   serveEx,     -- Listen on a port and ipv6 or ipv4 interface ... callback
-  nullMessage  -- A response which indicates no response
 ) where
 
 import Data.Int
@@ -85,13 +84,12 @@ data ServiceCallback = ServiceCallback (BsonDoc -> IO (Maybe (BsonDoc, ServiceCa
 instance Connection Peer where
   call doc p = syncRequests doc [p]
 
-  cast doc p = initMessage p MsgTypeCast 0 doc >>= 
+  cast doc p = snd `liftM` initMessage p MsgTypeCast 0 doc >>= 
     putMessage (pConn p) 
 
   asyncCall doc cb p = do 
-    mid <- getNextMsgId (pCurrent p)
+    (mid, msg) <- initMessage p MsgTypeCall 0 doc
     addCallback (pPending p) mid cb
-    msg <- initMessage p MsgTypeCall 0 doc
     putMessage (pConn p) msg 
 
 instance Connection Faction where
@@ -121,31 +119,29 @@ serveEx fam addr (callcb, castcb) = do
 
 handlePeer :: Handle -> Maybe ServiceCallback -> Maybe ServiceCallback -> IO ()
 handlePeer h callcb castcb = do
-  putStrLn "Client Connected"
   !self <- myThreadId >>= createPeer h 0
-  flip catch (closePeer h) $ forever $ do
-    putStrLn "Before receiving message"
-    (BsonMessage hdr doc) <- getMessage h
-    putStrLn "Received Message"
+  flip catch (closePeer h) $ loop self callcb castcb
+  where 
+    loop self cl cst = do
+    blah@(BsonMessage hdr doc) <- getMessage h
+    putStrLn $ "Received Message" ++ show blah
     case (getMsgType hdr) of
-      MsgTypeCall -> case callcb of 
+      MsgTypeCall -> case cl of 
         Nothing -> putStrLn "Received a call msg for which I don't have a handler"
         Just (ServiceCallback cb) -> do
           mrep <- cb doc
           case mrep of
-            Nothing -> return ()
+            Nothing -> loop self cl cst
             Just (reply, newcb) -> do
-              putStrLn "preparing to send reply"
-              mid <- getNextMsgId (pCurrent self)
-              msg <- initMessage self MsgTypeCall (bhMessageId hdr) reply
-              addCallback  (pPending self) mid newcb
+              (mid, msg) <- initMessage self MsgTypeCall (bhMessageId hdr) reply
               putStrLn $ "sending reply: " ++ show msg
               putMessage h msg 
-      MsgTypeCast -> case castcb of
-        Nothing -> putStrLn "Received msg for which I don't have a handler"
+              loop self (Just newcb) cst 
+      MsgTypeCast -> case cst of
+        Nothing -> putStrLn "Received cast msg for which I don't have a handler"
         Just (ServiceCallback cb) -> do 
         cb doc
-        return ()
+        loop self cl cst
       MsgTypeShutDown -> throwIO $ userError "end of session"
 
 closePeer :: Handle -> IOError -> IO ()
@@ -182,12 +178,9 @@ connectFactionEx fam addrs = Faction `liftM` forM addrs con
 shutdown :: Peer -> IO ()
 shutdown p = do 
   killThread (pListener p)
-  msg <- initMessage p MsgTypeShutDown 0 $ toBsonDoc [("", BsonNull)] 
+  (_, msg) <- initMessage p MsgTypeShutDown 0 $ toBsonDoc [("", BsonNull)] 
   putMessage (pConn p) msg
 
-nullMessage ::ServiceCallback -> Maybe (BsonDoc, ServiceCallback)
-nullMessage fun = Just (toBsonDoc [("", BsonNull)], fun)
-  
 {-
  - Private Functions
  -} 
@@ -195,35 +188,33 @@ nullMessage fun = Just (toBsonDoc [("", BsonNull)], fun)
 
 listen :: Handle -> MVar (M.Map Int64 ServiceCallback) -> MVar Int64 -> IO ()
 listen h m cur= do
-  putStrLn "Listening for message"
-  (BsonMessage hdr doc) <- getMessage h
+  blah@(BsonMessage hdr doc) <- getMessage h
+  putStrLn $ "Got message: " ++ show blah
   let mid = bhMessageId hdr
   cbmap <- readMVar m 
   case M.lookup mid cbmap of 
-    Nothing -> return ()
+    Nothing -> (putStrLn $ "no cb for mid: " ++ show mid) >> return ()
     Just (ServiceCallback cb) -> do 
       modifyMVar m (\x -> let y = M.delete mid x in return (y, ())) -- get rid of the existing cb
       mres <- cb doc
       case mres of
         Nothing -> return ()
         Just (reply, newcb) -> do 
-          newid <- getNextMsgId cur
+          !newid <- getNextMsgId cur
           let newhdr = BsonHeader 0 (msgTypeToInt MsgTypeCall) 0 0 newid mid 0 0 0 0
           addCallback m newid newcb 
           putMessage h (BsonMessage newhdr reply)
-    
+
  
 syncRequests :: BsonDoc -> [Peer] -> IO [BsonDoc]
 syncRequests doc prs = do  
     sem <- newQSem (length prs)
     c <- newChan
     forM_ prs $ \p -> do
-      mid <- getNextMsgId (pCurrent p)
-      msg <- initMessage p MsgTypeCall 0 doc
+      (mid, msg) <- initMessage p MsgTypeCall 0 doc
       registerSync p c sem mid
       putMessage (pConn p) msg
     waitQSem sem
-    putStrLn $ "collecting " ++ show (length prs)
     collect (length prs) c []
     where collect 0      _   acc = return acc
           collect count chan acc = do !i <- readChan chan; print i; collect (count - 1) chan (i:acc)
@@ -233,11 +224,11 @@ registerSync p chan sem mid = do
   let cb = ServiceCallback (\doc -> writeChan chan doc >> signalQSem sem >> return Nothing)
   addCallback (pPending p) mid cb
 
-initMessage :: Peer -> MessageType -> Int64 -> BsonDoc -> IO BsonMessage
+initMessage :: Peer -> MessageType -> Int64 -> BsonDoc -> IO (Int64, BsonMessage)
 initMessage peer mtype respto doc = do
-  mid <- getNextMsgId (pCurrent peer)
+  !mid <- getNextMsgId (pCurrent peer)
   let hdr = BsonHeader 0 (msgTypeToInt mtype) 0 0 mid respto 0 0 0 0
-  return $ BsonMessage hdr doc 
+  return $ (mid, BsonMessage hdr doc)
 
 getNextMsgId :: MVar Int64 -> IO Int64
 getNextMsgId current = modifyMVar current (\x -> let y = x + 1 in return (y, y) ) 
@@ -256,7 +247,8 @@ createPeer h p t = do
   return $ Peer B.empty B.empty (fromIntegral p) c h cbm t
  
 addCallback :: MVar (M.Map Int64 ServiceCallback) -> Int64 -> ServiceCallback -> IO ()
-addCallback pending mid cb = modifyMVar pending (\x -> let y = M.insert mid cb x in return (y, ()))
+addCallback pending mid cb = (putStrLn ("adding callback for " ++ show mid)) >> 
+  modifyMVar pending (\x -> let y = M.insert mid cb x in return (y, ()))
 
 instance Show (MVar Int64) where
   show = Prelude.show . unsafePerformIO . readMVar
