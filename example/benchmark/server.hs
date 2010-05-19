@@ -12,10 +12,7 @@ main = do
  
 handleCall :: BsonDoc -> IO (Maybe (BsonDoc, ServiceCallback))
 handleCall doc = do
-  secs <- getStdRandom $ randomR (1,5)
-  putStrLn "thinking..."
-  sleep secs
-  putStrLn ("call: " ++ (show doc))
+  --putStrLn ("call: " ++ (show doc))
   return $ Just (doc, ServiceCallback handleCall)
 
 
