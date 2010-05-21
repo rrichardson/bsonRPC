@@ -13,4 +13,4 @@ Links
 
 * [bsonRPC API reference](http://hackage.haskell.org/package/bsonRPC)
 * [tutorial](http://github.com/rrichardson/bsonRPC/blob/master/tutorial.md)
-* [challenge/response example](http://github.com/rrichardson/mongoDB/blob/master/challenge-response-example.md)
+* [challenge/response example](http://github.com/rrichardson/bsonRPC/blob/master/challenge-response-example.md)
