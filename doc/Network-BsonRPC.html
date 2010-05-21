@@ -1,0 +1,490 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Network.BsonRPC</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
+></SCRIPT
+><SCRIPT TYPE="text/javascript"
+>window.onload = function () {setSynopsis("mini_Network-BsonRPC.html")};</SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Network.BsonRPC</FONT
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Documentation</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>class</SPAN
+>  <A NAME="t:Connection"
+><A NAME="t%3AConnection"
+></A
+></A
+><B
+>Connection</B
+> a  <SPAN CLASS="keyword"
+>where</SPAN
+></TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+>Methods</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A NAME="v:call"
+><A NAME="v%3Acall"
+></A
+></A
+><B
+>call</B
+> :: BsonDoc -&gt; a -&gt; IO [BsonDoc]</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Synchronous call to a remote peer (or peers) which returns the reply
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:cast"
+><A NAME="v%3Acast"
+></A
+></A
+><B
+>cast</B
+> :: BsonDoc -&gt; a -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Asynchronous call to a remote peer (or peers) which does not wait 
+   nor does it expect a reply
+</TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:asyncCall"
+><A NAME="v%3AasyncCall"
+></A
+></A
+><B
+>asyncCall</B
+> :: BsonDoc -&gt; <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+> -&gt; a -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="doc"
+>Asynchronous call to a remote peer (or peers) which returns immediately
+   but takes a callback for responses as they arrive
+</TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s8"
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:Connection')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:Connection" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+><A HREF="Network-BsonRPC.html#t%3AConnection"
+>Connection</A
+> <A HREF="Network-BsonRPC.html#t%3AFaction"
+>Faction</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Network-BsonRPC.html#t%3AConnection"
+>Connection</A
+> <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+></TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t:Faction"
+><A NAME="t%3AFaction"
+></A
+></A
+><B
+>Faction</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v:Faction"
+><A NAME="v%3AFaction"
+></A
+></A
+><B
+>Faction</B
+> [<A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+>]</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:Faction')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:Faction" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Show <A HREF="Network-BsonRPC.html#t%3AFaction"
+>Faction</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Network-BsonRPC.html#t%3AConnection"
+>Connection</A
+> <A HREF="Network-BsonRPC.html#t%3AFaction"
+>Faction</A
+></TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t:Peer"
+><A NAME="t%3APeer"
+></A
+></A
+><B
+>Peer</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+><IMG SRC="minus.gif" CLASS="coll" ONCLICK="toggle(this,'i:Peer')" ALT="show/hide"
+> Instances</TD
+></TR
+><TR
+><TD CLASS="body"
+><DIV ID="i:Peer" STYLE="display:block;"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="decl"
+>Show <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A HREF="Network-BsonRPC.html#t%3AConnection"
+>Connection</A
+> <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+></TD
+></TR
+></TABLE
+></DIV
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><SPAN CLASS="keyword"
+>data</SPAN
+>  <A NAME="t:ServiceCallback"
+><A NAME="t%3AServiceCallback"
+></A
+></A
+><B
+>ServiceCallback</B
+>  </TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="section4"
+>Constructors</TD
+></TR
+><TR
+><TD CLASS="body"
+><TABLE CLASS="vanilla" CELLSPACING="1" CELLPADDING="0"
+><TR
+><TD CLASS="arg"
+><A NAME="v:ServiceCallback"
+><A NAME="v%3AServiceCallback"
+></A
+></A
+><B
+>ServiceCallback</B
+> (BsonDoc -&gt; IO (Maybe (BsonDoc, <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+>)))</TD
+><TD CLASS="rdoc"
+></TD
+></TR
+></TABLE
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:connectPeer"
+><A NAME="v%3AconnectPeer"
+></A
+></A
+><B
+>connectPeer</B
+> :: String -&gt; Int -&gt; IO <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:connectPeerEx"
+><A NAME="v%3AconnectPeerEx"
+></A
+></A
+><B
+>connectPeerEx</B
+> :: Family -&gt; SockAddr -&gt; IO <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:connectFaction"
+><A NAME="v%3AconnectFaction"
+></A
+></A
+><B
+>connectFaction</B
+> :: [(String, Int)] -&gt; IO <A HREF="Network-BsonRPC.html#t%3AFaction"
+>Faction</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:connectFactionEx"
+><A NAME="v%3AconnectFactionEx"
+></A
+></A
+><B
+>connectFactionEx</B
+> :: Family -&gt; [SockAddr] -&gt; IO <A HREF="Network-BsonRPC.html#t%3AFaction"
+>Faction</A
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:shutdown"
+><A NAME="v%3Ashutdown"
+></A
+></A
+><B
+>shutdown</B
+> :: <A HREF="Network-BsonRPC.html#t%3APeer"
+>Peer</A
+> -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:serve"
+><A NAME="v%3Aserve"
+></A
+></A
+><B
+>serve</B
+> :: Int -&gt; (Maybe <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+>, Maybe <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+>) -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:serveEx"
+><A NAME="v%3AserveEx"
+></A
+></A
+><B
+>serveEx</B
+> :: Family -&gt; SockAddr -&gt; (Maybe <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+>, Maybe <A HREF="Network-BsonRPC.html#t%3AServiceCallback"
+>ServiceCallback</A
+>) -&gt; IO ()</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 2.4.2</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>

@@ -1,0 +1,344 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN" "http://www.w3.org/TR/html4/loose.dtd">
+<!--Rendered using the Haskell Html Library v0.2-->
+<HTML
+><HEAD
+><META HTTP-EQUIV="Content-Type" CONTENT="text/html; charset=UTF-8"
+><TITLE
+>Network.BsonRPC.BinUtil</TITLE
+><LINK HREF="haddock.css" REL="stylesheet" TYPE="text/css"
+><SCRIPT SRC="haddock-util.js" TYPE="text/javascript"
+></SCRIPT
+><SCRIPT TYPE="text/javascript"
+>window.onload = function () {setSynopsis("mini_Network-BsonRPC-BinUtil.html")};</SCRIPT
+></HEAD
+><BODY
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD CLASS="topbar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><IMG SRC="haskell_icon.gif" WIDTH="16" HEIGHT="16" ALT=" "
+></TD
+><TD CLASS="title"
+></TD
+><TD CLASS="topbut"
+><A HREF="index.html"
+>Contents</A
+></TD
+><TD CLASS="topbut"
+><A HREF="doc-index.html"
+>Index</A
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="modulebar"
+><TABLE CLASS="vanilla" CELLSPACING="0" CELLPADDING="0"
+><TR
+><TD
+><FONT SIZE="6"
+>Network.BsonRPC.BinUtil</FONT
+></TD
+></TR
+></TABLE
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="section1"
+>Documentation</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putI8"
+><A NAME="v%3AputI8"
+></A
+></A
+><B
+>putI8</B
+> :: Int8 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putI16"
+><A NAME="v%3AputI16"
+></A
+></A
+><B
+>putI16</B
+> :: Int16 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putI32"
+><A NAME="v%3AputI32"
+></A
+></A
+><B
+>putI32</B
+> :: Int32 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putI64"
+><A NAME="v%3AputI64"
+></A
+></A
+><B
+>putI64</B
+> :: Int64 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putNothing"
+><A NAME="v%3AputNothing"
+></A
+></A
+><B
+>putNothing</B
+> :: Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putNull"
+><A NAME="v%3AputNull"
+></A
+></A
+><B
+>putNull</B
+> :: Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putS"
+><A NAME="v%3AputS"
+></A
+></A
+><B
+>putS</B
+> :: ByteString -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getI8"
+><A NAME="v%3AgetI8"
+></A
+></A
+><B
+>getI8</B
+> :: Integral a =&gt; Get a</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getI16"
+><A NAME="v%3AgetI16"
+></A
+></A
+><B
+>getI16</B
+> :: Get Int16</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getI32"
+><A NAME="v%3AgetI32"
+></A
+></A
+><B
+>getI32</B
+> :: Get Int32</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getI64"
+><A NAME="v%3AgetI64"
+></A
+></A
+><B
+>getI64</B
+> :: Get Int64</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getC"
+><A NAME="v%3AgetC"
+></A
+></A
+><B
+>getC</B
+> :: Get Char</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getS"
+><A NAME="v%3AgetS"
+></A
+></A
+><B
+>getS</B
+> :: Get (Integer, ByteString)</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getNull"
+><A NAME="v%3AgetNull"
+></A
+></A
+><B
+>getNull</B
+> :: Get ()</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putStrSz"
+><A NAME="v%3AputStrSz"
+></A
+></A
+><B
+>putStrSz</B
+> :: ByteString -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getW32"
+><A NAME="v%3AgetW32"
+></A
+></A
+><B
+>getW32</B
+> :: Get Word32</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putW32"
+><A NAME="v%3AputW32"
+></A
+></A
+><B
+>putW32</B
+> :: Word32 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:getW64"
+><A NAME="v%3AgetW64"
+></A
+></A
+><B
+>getW64</B
+> :: Get Word64</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="decl"
+><A NAME="v:putW64"
+><A NAME="v%3AputW64"
+></A
+></A
+><B
+>putW64</B
+> :: Word64 -&gt; Put</TD
+></TR
+><TR
+><TD CLASS="s15"
+></TD
+></TR
+><TR
+><TD CLASS="botbar"
+>Produced by <A HREF="http://www.haskell.org/haddock/"
+>Haddock</A
+> version 2.4.2</TD
+></TR
+></TABLE
+></BODY
+></HTML
+>
