@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-
 
 Copyright (C) 2010 Rick Richardson <rick.richardson@gmail.com> 
@@ -42,6 +43,8 @@ module Network.BsonRPC
   serveEx,     -- Listen on a port and ipv6 or ipv4 interface ... callback
 ) where
 
+import Data.Bson (Value(..), (=?), Document(..))
+import Data.UString (u)
 import Data.Int
 import qualified Data.Map as M
 import Control.Monad
@@ -52,21 +55,20 @@ import System.IO
 import System.IO.Unsafe -- for read-only debugging purposes 
 import qualified Network.Socket as Sock
 import Network.BsonRPC.Util
-import Database.MongoDB.BSON 
 import qualified Data.ByteString as B
 
 
 class Connection a where 
   -- | Synchronous call to a remote peer (or peers) which returns the reply
-  call :: BsonDoc -> a -> IO [BsonDoc]
+  call :: Document -> a -> IO [Document]
 
   -- | Asynchronous call to a remote peer (or peers) which does not wait 
   --   nor does it expect a reply
-  cast :: BsonDoc -> a -> IO ()
+  cast :: Document -> a -> IO ()
 
   -- | Asynchronous call to a remote peer (or peers) which returns immediately
   --   but takes a callback for responses as they arrive
-  asyncCall :: BsonDoc -> ServiceCallback -> a -> IO ()
+  asyncCall :: Document -> ServiceCallback -> a -> IO ()
 
 data Peer = Peer { pId :: B.ByteString,
                    pSvcId :: B.ByteString, 
@@ -79,7 +81,7 @@ data Peer = Peer { pId :: B.ByteString,
 
 data Faction = Faction [Peer] deriving (Show)
 
-data ServiceCallback = ServiceCallback (BsonDoc -> IO (Maybe (BsonDoc, ServiceCallback)))
+data ServiceCallback = ServiceCallback (Document -> IO (Maybe (Document, ServiceCallback)))
 
 instance Connection Peer where
   call doc p = syncRequests doc [p]
@@ -119,7 +121,7 @@ serveEx fam addr (callcb, castcb) = do
 
 handlePeer :: Handle -> Maybe ServiceCallback -> Maybe ServiceCallback -> IO ()
 handlePeer h callcb castcb = do
-  !self <- myThreadId >>= createPeer h 0
+  self <- myThreadId >>= createPeer h 0
   flip catch (closePeer h) $ loop self callcb castcb
   where 
     loop self cl cst = do
@@ -175,7 +177,7 @@ connectFactionEx fam addrs = Faction `liftM` forM addrs con
 shutdown :: Peer -> IO ()
 shutdown p = do 
   killThread (pListener p)
-  (_, msg) <- initMessage p MsgTypeShutDown 0 $ toBsonDoc [("", BsonNull)] 
+  (_, msg) <- initMessage p MsgTypeShutDown 0 $ ((u "") =? (Nothing :: Maybe Int)) -- < retarded
   putMessage (pConn p) msg
 
 {-
@@ -196,13 +198,13 @@ listen h m cur= do
       case mres of
         Nothing -> return ()
         Just (reply, newcb) -> do 
-          !newid <- getNextMsgId cur
+          newid <- getNextMsgId cur
           let newhdr = BsonHeader 0 (msgTypeToInt MsgTypeCall) 0 0 newid mid 0 0 0 0
           addCallback m newid newcb 
           putMessage h (BsonMessage newhdr reply)
 
  
-syncRequests :: BsonDoc -> [Peer] -> IO [BsonDoc]
+syncRequests :: Document -> [Peer] -> IO [Document]
 syncRequests doc prs = do  
     sem <- newQSem (length prs)
     c <- newChan
@@ -213,16 +215,16 @@ syncRequests doc prs = do
     waitQSem sem
     collect (length prs) c []
     where collect 0      _   acc = return acc
-          collect count chan acc = do !i <- readChan chan; collect (count - 1) chan (i:acc)
+          collect count chan acc = do i <- readChan chan; collect (count - 1) chan (i:acc)
 
-registerSync :: Peer -> Chan BsonDoc -> QSem -> Int64 -> IO ()
+registerSync :: Peer -> Chan Document -> QSem -> Int64 -> IO ()
 registerSync p chan sem mid = do
   let cb = ServiceCallback (\doc -> writeChan chan doc >> signalQSem sem >> return Nothing)
   addCallback (pPending p) mid cb
 
-initMessage :: Peer -> MessageType -> Int64 -> BsonDoc -> IO (Int64, BsonMessage)
+initMessage :: Peer -> MessageType -> Int64 -> Document -> IO (Int64, BsonMessage)
 initMessage peer mtype respto doc = do
-  !mid <- getNextMsgId (pCurrent peer)
+  mid <- getNextMsgId (pCurrent peer)
   let hdr = BsonHeader 0 (msgTypeToInt mtype) 0 0 mid respto 0 0 0 0
   return $ (mid, BsonMessage hdr doc)
 

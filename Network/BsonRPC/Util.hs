@@ -37,14 +37,14 @@ module Network.BsonRPC.Util
 )
 where
 
+import Data.Bson
+import Data.Bson.Binary
 import Data.Binary.Get
 import Data.Binary.Put
 import Data.Int
 import Data.Word
 import System.IO
 import Foreign.C.Types (CInt)
-import Database.MongoDB.BSON
-import Network.BsonRPC.BinUtil
 import qualified Network.Socket as Sock
 import qualified Data.ByteString.Lazy as L
 import Control.Monad
@@ -62,7 +62,7 @@ data BsonHeader = BsonHeader { bhSize        :: Int16,
                                bhOriginator4 :: Word32
                               } deriving (Show) -- 40 bytes total
                              
-data BsonMessage = BsonMessage BsonHeader BsonDoc deriving (Show) 
+data BsonMessage = BsonMessage BsonHeader Document deriving (Show) 
 
 
 
@@ -94,27 +94,45 @@ getMessage h = do
   res <- hWaitForInput h (-1)
   hdrBytes <- L.hGet h 40
   let hdr = flip runGet hdrBytes $ 
-              BsonHeader <$> getI16 <*> getI16 <*>
-                getI16 <*> getI16 <*> getI64 <*> getI64 <*>
-                getW32 <*> getW32 <*> getW32 <*> getW32
+              BsonHeader <$> getInt16 <*> getInt16 <*>
+                getInt16 <*> getInt16 <*> getInt64 <*> getInt64 <*>
+                getWord32 <*> getWord32 <*> getWord32 <*> getWord32
   docBytes <- L.hGet h (fromIntegral (bhSize hdr)- 40)
-  let doc = runGet getBsonDoc docBytes
+  let doc = runGet getDocument docBytes
   return $ BsonMessage hdr doc 
 
 putMessage :: Handle -> BsonMessage -> IO ()
 putMessage h (BsonMessage hdr doc) = do
-  let msg = runPut $ putBsonDoc doc
+  let msg = runPut $ putDocument doc
   let str = runPut $ do
-                putI16 $ fromIntegral (40 + L.length msg)
-                putI16 $ bhType hdr 
-                putI16 $ bhVersion hdr
-                putI16 $ bhDest hdr
-                putI64 $ bhMessageId hdr
-                putI64 $ bhResponseTo  hdr
-                putW32 $ bhOriginator1 hdr
-                putW32 $ bhOriginator2 hdr
-                putW32 $ bhOriginator3 hdr
-                putW32 $ bhOriginator4 hdr
+                putInt16 $ fromIntegral (40 + L.length msg)
+                putInt16 $ bhType hdr 
+                putInt16 $ bhVersion hdr
+                putInt16 $ bhDest hdr
+                putInt64 $ bhMessageId hdr
+                putInt64 $ bhResponseTo  hdr
+                putWord32 $ bhOriginator1 hdr
+                putWord32 $ bhOriginator2 hdr
+                putWord32 $ bhOriginator3 hdr
+                putWord32 $ bhOriginator4 hdr
                 putLazyByteString msg
   L.hPut h str
   hFlush h
+
+getInt16 :: Get Int16
+getInt16 = liftM fromIntegral getWord16le
+
+getWord64 :: Get Word64
+getWord64 = getWord64le
+
+getWord32 :: Get Word32
+getWord32 = getWord32le
+
+putInt16 :: Int16 -> Put
+putInt16 = putWord16le . fromIntegral
+
+putWord64 :: Word64 -> Put
+putWord64 = putWord64le
+
+putWord32 :: Word32 -> Put
+putWord32 = putWord32le

@@ -35,34 +35,34 @@ import Control.Monad
 import Data.Binary
 import Data.Binary.Get
 import Data.Binary.Put
-import Data.ByteString.Char8
+import Data.ByteString.Char8 (pack, ByteString)
 import qualified Data.ByteString.Lazy as L
-import qualified Data.ByteString.Lazy.UTF8 as L8
 import Data.Char          (chr)
 import Data.Int
+import Data.UString (UString)
 
 getC :: Get Char
 getC = liftM chr getI8
 
-getI8 :: (Integral a) => Get a
+getInt8 :: (Integral a) => Get a
 getI8 = liftM fromIntegral getWord8
 
-getI16 :: Get Int16
-getI16 = liftM fromIntegral getWord16le
+getInt16 :: Get Int16
+getInt16 = liftM fromIntegral getWord16le
 
-getI32 :: Get Int32
-getI32 = liftM fromIntegral getWord32le
+getInt32 :: Get Int32
+getInt32 = liftM fromIntegral getWord32le
 
-getI64 :: Get Int64
-getI64 = liftM fromIntegral getWord64le
+getInt64 :: Get Int64
+getInt64 = liftM fromIntegral getWord64le
 
-getW64 :: Get Word64
-getW64 = getWord64le
+getWord64 :: Get Word64
+getWord64 = getWord64le
 
-getW32 :: Get Word32
-getW32 = getWord32le
+getWord32 :: Get Word32
+getWord32 = getWord32le
 
-getS :: Get (Integer, L8.ByteString)
+getS :: Get (Integer, UString)
 getS = getLazyByteStringNul >>= \s -> return (fromIntegral $ L.length s + 1, s)
 
 getNull :: Get ()
@@ -93,9 +93,9 @@ putNothing = putByteString $ pack ""
 putNull :: Put
 putNull = putI8 0
 
-putS :: L8.ByteString -> Put
+putS :: UString -> Put
 putS s = putLazyByteString s >> putNull
 
-putStrSz :: L8.ByteString -> Put
+putStrSz :: UString -> Put
 putStrSz s = putI32 (fromIntegral $ 1 + L.length s) >> putS s
 

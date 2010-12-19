@@ -12,22 +12,23 @@ Description:         This module will allow remote peers to communicate in a cli
                      or peer2peer arrangement using the flexible and extensible BSON protocol.
                      This relies on the mongoDB driver for Haskell by Scott Parish. 
 Stability:           alpha
-Build-Depends:       base < 5,
-	       binary,
-		     bytestring,
-		     containers,
-		     data-binary-ieee754,
-		     network,
-		     random,
-		     time,
-		     unix,
-		     utf8-string,
-         nano-md5,
-         mongoDB,
-         mtl
 Build-Type:          Simple
-Exposed-modules:     Network.BsonRPC
-Other-modules:       Network.BsonRPC.Util, Network.BsonRPC.BinUtil
-ghc-options:         -threaded -Wall -O2
+ghc-options:         -XBangPatterns -threaded -Wall -O2
 extensions:          FlexibleInstances, BangPatterns
 cabal-version:       >= 1.4
+
+Library
+    Build-Depends:  base < 5,
+                    bytestring,
+                    containers,
+                    data-binary-ieee754,
+                    network,
+                    random,
+                    time,
+                    unix,
+                    nano-md5,
+                    mtl,
+                    binary,
+                    bson
+    Exposed-modules: Network.BsonRPC
+    Other-modules:  Network.BsonRPC.Util
